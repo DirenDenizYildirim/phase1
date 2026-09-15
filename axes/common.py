@@ -13,7 +13,10 @@ EMPTY, RIGID, SOFT, H_ACT, V_ACT = 0, 1, 2, 3, 4
 VOXEL_NAMES = {EMPTY: "empty", RIGID: "rigid", SOFT: "soft",
                H_ACT: "h_actuator", V_ACT: "v_actuator"}
 
-BOUNDING_BOX = (5, 5)
+# The ground truth's search space is 3x3, NOT 5x5 -- verified exactly: our independent
+# enumeration of feasible 3x3 grids reproduces the published key set (1,305,840 IDs,
+# min 93, max 5**9-1) as an exact set match. See notes/dataset.md.
+BOUNDING_BOX = (3, 3)
 
 # --- Environment config, matched to the ground truth (see notes/dataset.md) ---
 TASK = "Walker-v0"
@@ -41,6 +44,11 @@ def idx_to_grid(idx: int, bounding_box: tuple[int, int] = BOUNDING_BOX) -> np.nd
 def grid_to_idx(grid: np.ndarray) -> int:
     """Voxel grid -> integer morphology ID. Mirrors ``search_space.ndarray_to_integer_idx``."""
     return int("".join(np.asarray(grid).flatten().astype(int).astype(str)), 5)
+
+
+def grid_from_str(s: str, bounding_box: tuple[int, int] = BOUNDING_BOX) -> np.ndarray:
+    """Inverse of the `grid` column stored in the sample parquet files."""
+    return np.array([int(c) for c in s], dtype=int).reshape(bounding_box)
 
 
 def is_feasible(grid: np.ndarray) -> bool:

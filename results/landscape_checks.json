@@ -1,0 +1,46 @@
+{
+  "smoothness": {
+    "n_morphologies": 1305840,
+    "n_with_neighbours": 1305840,
+    "neighbours_per_morphology_mean": 31.999522146664216,
+    "neighbours_per_morphology_min": 15,
+    "neighbours_per_morphology_max": 36,
+    "spearman_mean_neighbour_vs_truth": 0.8144185217285084,
+    "spearman_max_neighbour_vs_truth": 0.6139782716351156,
+    "pearson_mean_neighbour_vs_truth": 0.8304688886758629,
+    "spearman_by_decile": {
+      "0": 0.06845282937788495,
+      "1": 0.09322887398213861,
+      "2": 0.022678358078858114,
+      "3": 0.11126587588622046,
+      "4": 0.22550355751183263,
+      "5": 0.14729882919279166,
+      "6": 0.13532033391129397,
+      "7": 0.14144638611501184,
+      "8": 0.20741665145529453,
+      "9": 0.47469778196967183
+    }
+  },
+  "noise_ceiling": {
+    "value_types": [
+      "ndarray"
+    ],
+    "value_shapes": [
+      "(300,)"
+    ],
+    "values_per_morphology": [
+      300
+    ],
+    "n_morphologies": 1305840,
+    "has_repeated_attempts": false
+  },
+  "revision_stats": {
+    "n_revised_upward": 76525,
+    "n_revised_downward": 0,
+    "fraction_revised": 0.058602125834711756,
+    "revision_median": 0.7430410588007292,
+    "revision_mean": 1.0465383593633744,
+    "revision_max": 9.301648933676203,
+    "spearman_raw_final_vs_true": 0.9764486630564004
+  }
+}

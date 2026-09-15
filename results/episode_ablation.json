@@ -1,0 +1,270 @@
+{
+  "curve": [
+    {
+      "protocol": "current",
+      "statistic": "max",
+      "episodes": 1,
+      "sim_steps": 300,
+      "spearman": 0.35171508809746693,
+      "ci_lo": 0.27471269317650315,
+      "ci_hi": 0.41637416202743815
+    },
+    {
+      "protocol": "current",
+      "statistic": "mean",
+      "episodes": 1,
+      "sim_steps": 300,
+      "spearman": 0.35171508809746693,
+      "ci_lo": 0.283346714921845,
+      "ci_hi": 0.41807540316370695
+    },
+    {
+      "protocol": "current",
+      "statistic": "max",
+      "episodes": 2,
+      "sim_steps": 600,
+      "spearman": 0.4451897921938671,
+      "ci_lo": 0.3801658830596928,
+      "ci_hi": 0.5090664304706313
+    },
+    {
+      "protocol": "current",
+      "statistic": "mean",
+      "episodes": 2,
+      "sim_steps": 600,
+      "spearman": 0.3633161758782663,
+      "ci_lo": 0.29043084136610975,
+      "ci_hi": 0.43045996559762073
+    },
+    {
+      "protocol": "current",
+      "statistic": "max",
+      "episodes": 4,
+      "sim_steps": 1200,
+      "spearman": 0.5113629760082666,
+      "ci_lo": 0.4464406851149099,
+      "ci_hi": 0.5678779127629353
+    },
+    {
+      "protocol": "current",
+      "statistic": "mean",
+      "episodes": 4,
+      "sim_steps": 1200,
+      "spearman": 0.3898456940158167,
+      "ci_lo": 0.3172570173356418,
+      "ci_hi": 0.45995376688269196
+    },
+    {
+      "protocol": "current",
+      "statistic": "max",
+      "episodes": 8,
+      "sim_steps": 2400,
+      "spearman": 0.5428503412509478,
+      "ci_lo": 0.47820089273116206,
+      "ci_hi": 0.5990063379733959
+    },
+    {
+      "protocol": "current",
+      "statistic": "mean",
+      "episodes": 8,
+      "sim_steps": 2400,
+      "spearman": 0.4073820760613223,
+      "ci_lo": 0.3413452198678845,
+      "ci_hi": 0.4735738544075197
+    },
+    {
+      "protocol": "current",
+      "statistic": "max",
+      "episodes": 16,
+      "sim_steps": 4800,
+      "spearman": 0.5614477817993939,
+      "ci_lo": 0.5036769561862724,
+      "ci_hi": 0.617828389480126
+    },
+    {
+      "protocol": "current",
+      "statistic": "mean",
+      "episodes": 16,
+      "sim_steps": 4800,
+      "spearman": 0.4029450637362881,
+      "ci_lo": 0.3343610360895442,
+      "ci_hi": 0.4648902994937951
+    },
+    {
+      "protocol": "matched",
+      "statistic": "max",
+      "episodes": 1,
+      "sim_steps": 500,
+      "spearman": 0.44167161575448816,
+      "ci_lo": 0.37309884737939675,
+      "ci_hi": 0.5050857766707062
+    },
+    {
+      "protocol": "matched",
+      "statistic": "mean",
+      "episodes": 1,
+      "sim_steps": 500,
+      "spearman": 0.44167161575448816,
+      "ci_lo": 0.3736571791488253,
+      "ci_hi": 0.505037100174332
+    },
+    {
+      "protocol": "matched",
+      "statistic": "max",
+      "episodes": 2,
+      "sim_steps": 1000,
+      "spearman": 0.4909480859669054,
+      "ci_lo": 0.42835063037667,
+      "ci_hi": 0.5467340061033336
+    },
+    {
+      "protocol": "matched",
+      "statistic": "mean",
+      "episodes": 2,
+      "sim_steps": 1000,
+      "spearman": 0.3832634535095931,
+      "ci_lo": 0.3170676077804201,
+      "ci_hi": 0.45146342117486515
+    },
+    {
+      "protocol": "matched",
+      "statistic": "max",
+      "episodes": 4,
+      "sim_steps": 2000,
+      "spearman": 0.5305841960672113,
+      "ci_lo": 0.4702671733082356,
+      "ci_hi": 0.5855615605918026
+    },
+    {
+      "protocol": "matched",
+      "statistic": "mean",
+      "episodes": 4,
+      "sim_steps": 2000,
+      "spearman": 0.41439887333020364,
+      "ci_lo": 0.35049093773291706,
+      "ci_hi": 0.47977685340199505
+    },
+    {
+      "protocol": "matched",
+      "statistic": "max",
+      "episodes": 8,
+      "sim_steps": 4000,
+      "spearman": 0.5650849585693293,
+      "ci_lo": 0.5102547963868462,
+      "ci_hi": 0.6176279069428074
+    },
+    {
+      "protocol": "matched",
+      "statistic": "mean",
+      "episodes": 8,
+      "sim_steps": 4000,
+      "spearman": 0.4288017466715185,
+      "ci_lo": 0.36273820881213353,
+      "ci_hi": 0.49566886979603936
+    },
+    {
+      "protocol": "matched",
+      "statistic": "max",
+      "episodes": 16,
+      "sim_steps": 8000,
+      "spearman": 0.5708058633496205,
+      "ci_lo": 0.5125134211673219,
+      "ci_hi": 0.6235270997025603
+    },
+    {
+      "protocol": "matched",
+      "statistic": "mean",
+      "episodes": 16,
+      "sim_steps": 8000,
+      "spearman": 0.4151159308775857,
+      "ci_lo": 0.34739626450552824,
+      "ci_hi": 0.4818976237573803
+    }
+  ],
+  "paired": [
+    {
+      "comparison": "matched(1 ep) - current(1 ep)",
+      "kind": "equal episodes",
+      "diff": 0.08995652765702122,
+      "ci_lo": 0.026109080320693954,
+      "ci_hi": 0.15389491379668532
+    },
+    {
+      "comparison": "matched(2 ep) - current(2 ep)",
+      "kind": "equal episodes",
+      "diff": 0.045758293773038305,
+      "ci_lo": -0.010497782550202868,
+      "ci_hi": 0.10167997656450035
+    },
+    {
+      "comparison": "matched(4 ep) - current(4 ep)",
+      "kind": "equal episodes",
+      "diff": 0.019221220058944666,
+      "ci_lo": -0.030374215178113964,
+      "ci_hi": 0.0658739376102371
+    },
+    {
+      "comparison": "matched(8 ep) - current(8 ep)",
+      "kind": "equal episodes",
+      "diff": 0.0222346173183815,
+      "ci_lo": -0.02146329900566679,
+      "ci_hi": 0.06399987547181055
+    },
+    {
+      "comparison": "matched(16 ep) - current(16 ep)",
+      "kind": "equal episodes",
+      "diff": 0.009358081550226549,
+      "ci_lo": -0.03469884035145068,
+      "ci_hi": 0.05216924580251179
+    },
+    {
+      "comparison": "matched(1 ep, 500 steps) - current(2 ep, 600 steps)",
+      "kind": "~equal cost",
+      "diff": -0.0035181764393789616,
+      "ci_lo": -0.06487795827907282,
+      "ci_hi": 0.05705519613397901
+    },
+    {
+      "comparison": "matched(4 ep, 2000 steps) - current(8 ep, 2400 steps)",
+      "kind": "~equal cost",
+      "diff": -0.012266145183736477,
+      "ci_lo": -0.05610857977722287,
+      "ci_hi": 0.030334865391295512
+    },
+    {
+      "comparison": "matched(8 ep, 4000 steps) - current(16 ep, 4800 steps)",
+      "kind": "~equal cost",
+      "diff": 0.0036371767699353574,
+      "ci_lo": -0.04133502582007967,
+      "ci_hi": 0.050247753311806205
+    },
+    {
+      "comparison": "current: 1 -> 2 episodes",
+      "kind": "doubling",
+      "diff": 0.09347470409640019,
+      "ci_lo": 0.05894006767243648,
+      "ci_hi": 0.13177752867634515
+    },
+    {
+      "comparison": "current: 2 -> 4 episodes",
+      "kind": "doubling",
+      "diff": 0.06617318381439952,
+      "ci_lo": 0.04194171749584742,
+      "ci_hi": 0.09304796295621834
+    },
+    {
+      "comparison": "current: 4 -> 8 episodes",
+      "kind": "doubling",
+      "diff": 0.03148736524268114,
+      "ci_lo": 0.005511743575947318,
+      "ci_hi": 0.057542015463558124
+    },
+    {
+      "comparison": "current: 8 -> 16 episodes",
+      "kind": "doubling",
+      "diff": 0.018597440548446142,
+      "ci_lo": -0.006216701681215872,
+      "ci_hi": 0.04094554362698422
+    }
+  ]
+}
