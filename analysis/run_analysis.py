@@ -160,11 +160,16 @@ def gbt_permutation_importance(X, y, feature_names):
 
 # ----------------------------------------------------------------------- top-100 recall
 
-def top100_recall(full: pd.DataFrame, cols: list[str], gbt_oof: np.ndarray | None) -> pd.DataFrame:
+def top100_recall(full: pd.DataFrame, cols: list[str], gbt_oof: np.ndarray | None,
+                  orient: dict[str, float]) -> pd.DataFrame:
     """Fraction of the true top-100 landing in each axis's top quartile of the pooled sample.
 
     Computed on the full 700-row sample (the 100 must be present to be recalled). The chance
     rate is 0.25 by construction, so anything near 0.25 is no signal at all.
+
+    An axis can point either way, so each is oriented to "higher = better" first. `orient` must
+    be derived from the **stratified** sample only: deciding the sign from the pooled sample
+    would peek at the very top-100 membership the metric is scoring.
     """
     is_top = full["in_top100"].to_numpy()
     n_q = int(np.ceil(0.25 * len(full)))
@@ -183,10 +188,7 @@ def top100_recall(full: pd.DataFrame, cols: list[str], gbt_oof: np.ndarray | Non
 
     for c in cols:
         fam = next((k for k, v in AXIS_FAMILY.items() if c in v), "other")
-        # An axis can point either way; credit the orientation that correlates positively.
-        r = spearmanr(full[c].to_numpy(dtype=float), full["true_fitness"].to_numpy(),
-                      nan_policy="omit").statistic
-        recall_of(full[c].to_numpy(dtype=float) * (1 if (r or 0) >= 0 else -1), c, fam)
+        recall_of(full[c].to_numpy(dtype=float) * orient[c], c, fam)
     if gbt_oof is not None:
         recall_of(gbt_oof, "GBT (all axes, out-of-fold)", "model")
     return pd.DataFrame(rows).sort_values("top100_recall", ascending=False).reset_index(drop=True)
@@ -317,7 +319,10 @@ def main() -> None:
     # --- 5. top-100 recall, on the full 700-row pool ---
     Xf = full[cols].to_numpy(dtype=float)
     gbt_oof_full = cv_predict(make_models()["gbt"], Xf, full["true_fitness"].to_numpy())
-    rec = top100_recall(full, cols, gbt_oof_full)
+    # Orientation comes from the stratified sample only -- see top100_recall's docstring.
+    orient = {c: (1.0 if (corr.set_index("axis").loc[c, "spearman"] or 0) >= 0 else -1.0)
+              for c in cols}
+    rec = top100_recall(full, cols, gbt_oof_full, orient)
     rec.to_csv(RESULTS / "top100_recall.csv", index=False)
     print("\n=== top-100 recall in the top quartile (chance = 0.25) ===")
     print(rec.head(15).to_string(index=False))
