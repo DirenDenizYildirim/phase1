@@ -39,20 +39,36 @@ covers. Full derivation in `notes/dataset.md`.
 | true fitness range | −5.2718 … +4.4237 (median −4.2694, mean −3.8793) |
 
 **What a fitness number means.** `Walker-v0` rewards per-step centre-of-mass x-displacement, and
-the upstream wrapper subtracts 0.05 per step, so
+the upstream wrapper subtracts 0.05 per **controller query**, so
 
-> fitness = (net COM x-displacement in world units) − 0.05 × (number of steps)
+> fitness = (net COM x-displacement in world units) − 0.05 × (number of controller queries)
+> = dx − 5.0
 
-with an episode of **100 steps**. So **−5.0 means "did not move at all"**, and each point above
-that is one world unit (ten voxel widths) of travel.
+So **−5.0 means "did not move at all"**, and each point above that is one world unit (ten voxel
+widths) of travel.
 
-The 100-step episode length was established empirically, not assumed: the upstream code's
-`_max_episode_steps = 500` assignment walks past the `TimeLimit` wrapper and lands on a dead
-attribute. Generation-1 controllers are random networks, so their net displacement should be near
-zero — and under a 100-step episode the ground truth's generation-1 fitness implies a mean
-displacement of **+0.012**, against **+0.010** measured here for random actions over 100 steps.
-Under 500 steps it would have to be **+20**, which is more than an order of magnitude beyond what
-is reachable even at 500 steps. Two further checks agree (see `notes/dataset.md` §5).
+**Episode structure — corrected against the paper.** An episode is **500 simulator steps**, and
+the controller is queried every 5th step with the action held in between, giving **100 controller
+queries**. The paper states this directly ("Task and fitness"):
+
+> "The controller is queried every 5th timestep, and the last action is repeated for the remaining
+> timesteps." … "an additional small negative penalty (−0.05) is applied each time step before the
+> robot reaches the target"
+
+That is `ActionSkipWrapper(skip=5)` wrapped by `RewardShapingWrapper`, so the penalty is charged
+per outer call: 500 / 5 = 100 queries × −0.05 = **−5.0**.
+
+> An earlier draft of this report claimed the episode was "100 steps" and attributed it to the
+> upstream `_max_episode_steps = 500` assignment landing on a dead attribute past the `TimeLimit`
+> wrapper. **The −5.0 offset was right; that mechanism was wrong.** `TimeLimit` governs at 500
+> steps either way, and the factor of 5 is the action-skip.
+
+Confirmed by replicating the upstream wrapper stack over 40 morphologies with random actions:
+fitness min −5.90 / max −4.26 / **mean −5.09**, against ground-truth generation-1 fitness
+min −5.77 / max −4.65 / **mean −4.99** — matching in both centre and spread, with episodes running
+exactly 100 outer and 500 inner steps. A 500-step episode without action-skip would need a −25.0
+offset and an implied mean displacement of +20, which is unreachable. Details in
+`notes/dataset.md` §5.
 
 **The distribution is brutally floor-heavy.** A quarter of all morphologies sit within 0.08 of
 "did not move"; the median travels only ~0.73 units in 100 steps. Good morphologies are rare.
@@ -71,11 +87,18 @@ Our probes use the same environment as the ground truth, confirmed against the u
 | grid orientation | row 0 is the **top** of the robot (verified empirically) |
 | env seed | 17 (the ground truth's own value) |
 | EvoGym | 2.0.0, simulator v2.2.5, Python 3.10 |
+| ground-truth episode | 500 simulator steps, action held 5 steps (100 controller queries) |
+| **our probe episodes** | **300 simulator steps, fresh action every step** |
 
 We deliberately do **not** apply the ground truth's `RewardShapingWrapper`: no axis reads the
-reward signal, they read COM kinematics straight off the simulator. Probe episodes are 300 steps
-(the brief's value); displacement at the ground truth's own 100-step horizon is recorded alongside
-for free as `sin_best_dx_short`.
+reward signal, they read COM kinematics straight off the simulator.
+
+> **Known limitation.** Our probes match the ground truth's task, body construction and seed, but
+> **not its episode horizon or its control rate** — 300 steps at full rate versus 500 steps at
+> one-fifth rate. This was not a deliberate choice; it followed from taking the brief's "300
+> steps" literally before the action-skip was discovered. §10 measures what it cost.
+> `sin_best_dx_short` (displacement at 100 simulator steps) was described in an earlier draft as
+> "the ground truth's own horizon" — it is not; the ground truth's horizon is 500 simulator steps.
 
 **No controller was trained anywhere in this pipeline.** Every actuation signal is constant,
 uniform random, or sinusoidal. No policy parameters are ever updated.
@@ -265,33 +288,96 @@ Several structural axes score *far below* chance (`modularity` 0.03, `n_voxels` 
 rank the top-100 morphologies near the bottom. The best morphologies are not the biggest or the
 most modular ones.
 
-## 9. Assumptions
+## 9. Where 0.655 sits: landscape smoothness and the noise ceiling
 
-Collected from the notes. Only one substantive assumption was needed.
+Two whole-map checks, both computed over all 1,305,840 morphologies with **no simulation at all**
+(`analysis/landscape_checks.py`, under a minute). Full write-up in `notes/landscape.md`.
 
-> **ASSUMPTION** (`notes/dataset.md` §6) — the upstream README states that `updated_results.pkl`
-> holds "the estimated true fitness" but never describes how those estimates were produced, and
-> the file that would reveal it (`updated_results_w_long.pkl`, referenced at
-> `morphology_space_evolution.py:124`) is **not in the published tarball**. Measured over the full
-> map, `updated_results` differs from the 300-generation final value for 76,525 of 1,305,840
-> morphologies (5.86%) and is **always larger, never smaller**, by up to 9.30 — consistent with
-> promising morphologies being re-evaluated with longer or repeated runs and the best kept. We
-> take the file at face value as the ground-truth target, per the README. This does not affect the
-> method (we only need a fixed per-morphology scalar), but it does mean true fitness is a
-> *best-of-attempts* estimate, so it is mildly optimistic and noisy — which puts a ceiling on
-> any achievable correlation that we cannot quantify.
+### 9a. Smoothness — a neighbour oracle reaches ρ = 0.814
 
-Two things that might look like assumptions but are **not** — both were verified:
+Predicting each morphology's fitness from the **mean true fitness of its feasible one-voxel
+neighbours** gives **Spearman 0.814** against truth (Pearson 0.830; the *max*-neighbour variant is
+weaker at 0.614). Morphologies have 32.0 feasible neighbours on average, out of 36 candidates.
 
-- the 3x3 search space (exact set match against independent enumeration, §1);
-- the 100-step episode length (empirical, §1 and `notes/dataset.md` §5).
+This is an **oracle**, not a ceiling our axes could be expected to hit — it is handed every
+neighbour's ground-truth fitness. Read it as: *how strongly does a body's position in the design
+space constrain its fitness?* Quite strongly.
+
+So our 0.655 sits meaningfully below 0.814, and there is real headroom. **But the breakdown
+changes what that headroom means.** Recomputing the same oracle statistic *within* each
+true-fitness decile:
+
+| decile | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Spearman | +0.07 | +0.09 | +0.02 | +0.11 | +0.23 | +0.15 | +0.14 | +0.14 | +0.21 | **+0.48** |
+
+Inside any decile but the top one, even a full neighbour oracle manages ρ ≤ 0.23. **The 0.814 is
+almost entirely coarse-band separation, not fine-grained ranking.** The landscape is smooth at
+large scale and close to flat-or-noisy at small scale.
+
+The practical reading: the gap from 0.655 to 0.814 is concentrated in exactly the part of the
+problem the reach axes already handle — telling broad bands apart. Fine discrimination within a
+band looks close to irreducible from body identity alone, so a predictor chasing the last 0.15 is
+chasing the easier half.
+
+### 9b. Noise ceiling — unknown, and it stays unknown
+
+`raw_results.npy` stores, per morphology, a **single 1-D array of 300 floats**: best-so-far fitness
+after each generation of **one** controller-evolution run. Checked over a 200-morphology sample —
+every value is `(300,)`, never 2-D, never a list of runs.
+
+**There is one attempt per morphology, so no split-half reliability can be computed, and the noise
+ceiling on ground truth is unknown.** We do not estimate it.
+
+What the data *does* support: the published true fitness revises the 300-generation result upward
+for **76,525 morphologies (5.86%)** — never downward — by a median of **+0.743** and a maximum of
+**+9.301**, on a scale spanning about 9.7 in total.
+
+> Spearman(300-generation final, published true fitness) is 0.976, and it is tempting to quote
+> that as reliability. **It is not, and we do not.** True fitness is defined as the better of the
+> 300-generation result and anything the co-optimization runs found, so the two are dependent by
+> construction — one is a maximum involving the other.
+
+The sound conclusion is one-sided: a single run under-estimates achievable fitness for at least
+5.86% of morphologies, sometimes badly. Our target is therefore a noisy lower bound, which means
+**0.655 under-states correlation with truly achievable fitness by an unknown margin.**
+
+## 10. Episode-count ablation: how correlation buys itself with compute
+
+*(Pending — `analysis/episode_ablation.py` running at time of writing.)*
+
+## 11. Assumptions
+
+**No unresolved assumptions remain.** The single ASSUMPTION carried by the first draft has since
+been resolved against the paper.
+
+> **RESOLVED** (was an ASSUMPTION about `updated_results.pkl`) — the repo never documents how the
+> updated fitnesses were produced, and the file that would show it
+> (`updated_results_w_long.pkl`, referenced at `morphology_space_evolution.py:124`) is absent from
+> the published tarball. The **paper** states it, in "Updating the Landscape": fitness was
+> re-estimated for **76,526** morphologies using controllers discovered during the
+> 10,000-generation co-optimization runs. Our independent count of revised entries is **76,525**,
+> off by one — presumably a morphology whose revised value was not numerically distinguishable.
+>
+> So true fitness is the best controller found for a body across the 300-generation AFPO run *and*
+> the co-optimization runs: a best-of-attempts **lower bound** on achievable fitness, noisy by an
+> amount the published data cannot reveal (§9b).
+
+Three claims that might look like assumptions but were each verified independently:
+
+- **the 3x3 search space** — exact set match against our own enumeration (§1), and the paper says
+  so outright: *"each viable morphology that exists in the 3-by-3 morphology space"*. The
+  abstract's "1,305,840 voxel-based soft robots" matches our enumerated count exactly.
+- **the −5.0 fitness offset** — arithmetic confirmed, and the mechanism corrected against the
+  paper and by replicating the upstream wrapper stack (§1).
+- **`n_components` being constant** — computed rather than assumed, then dropped as zero-variance.
 
 One network blocker was hit and resolved without losing scope: the git proxy refuses git-LFS
 objects for this repo and a credentialed attach was denied, so the data was fetched from GitHub's
 public LFS media host, with SHA-256 and byte size verified against the repo's own LFS pointer
 (`notes/blockers.md`).
 
-## 10. Conclusion
+## 12. Conclusion
 
 **Do cheap, training-free axes carry meaningful signal about achievable fitness?**
 
@@ -329,7 +415,7 @@ What this does **not** establish: that these axes would survive on a harder task
 walking, on larger bodies, or that ρ ≈ 0.65 is enough to actually drive a search. Those are Stage 2
 questions.
 
-## 11. Next run
+## 13. Next run
 
 Before running on the 3000-morphology sample (`data/sample_large_ids.parquet`, already written):
 
