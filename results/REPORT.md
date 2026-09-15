@@ -344,7 +344,60 @@ The sound conclusion is one-sided: a single run under-estimates achievable fitne
 
 ## 10. Episode-count ablation: how correlation buys itself with compute
 
-*(Pending — `analysis/episode_ablation.py` running at time of writing.)*
+16 random-actuation episodes were run per morphology over the 600 stratified bodies, recording
+each episode's displacement so `rand_dx_max` can be recomputed over nested prefixes without
+re-simulating. Two protocols side by side: **`current`** (300 steps, fresh action every step — what
+Stage 1 used) and **`matched`** (500 steps, action held 5 steps — what the ground truth actually
+does, §1). 50.7 min on 4 cores. Plot: `results/episode_ablation.png`; tables:
+`results/episode_ablation{,_paired}.csv`.
+
+Sanity check that the harness is sound: at 1 episode `rand_dx_max` and `rand_dx_mean` are
+identical by definition, and both come out at exactly 0.352 / 0.442. The 8-episode `current`
+column also reproduces `data/axes.parquet`'s `rand_dx_max` value for value.
+
+| episodes | `current` sim steps | `current` ρ | `matched` sim steps | `matched` ρ |
+|---|---|---|---|---|
+| 1 | 300 | 0.352 | 500 | 0.442 |
+| 2 | 600 | 0.445 | 1,000 | 0.491 |
+| 4 | 1,200 | 0.511 | 2,000 | 0.531 |
+| 8 | 2,400 | **0.543** | 4,000 | 0.565 |
+| 16 | 4,800 | 0.561 | 8,000 | **0.571** |
+
+Marginal CIs overlap heavily, and they cannot settle these comparisons because every protocol is
+measured on the *same* morphologies. Bootstrapping the **difference** instead:
+
+| comparison | Δρ | 95% CI | significant |
+|---|---|---|---|
+| current: 1 → 2 episodes | +0.093 | [+0.059, +0.132] | **yes** |
+| current: 2 → 4 episodes | +0.066 | [+0.042, +0.093] | **yes** |
+| current: 4 → 8 episodes | +0.031 | [+0.006, +0.058] | **yes** |
+| current: 8 → 16 episodes | +0.019 | [−0.006, +0.041] | no |
+| matched − current, 1 episode each | +0.090 | [+0.026, +0.154] | **yes** |
+| matched − current, 8 episodes each | +0.022 | [−0.021, +0.064] | no |
+| **matched(4 ep, 2000 steps) − current(8 ep, 2400 steps)** | −0.012 | [−0.056, +0.030] | no |
+| **matched(8 ep, 4000 steps) − current(16 ep, 4800 steps)** | +0.004 | [−0.041, +0.050] | no |
+
+Three things fall out, and two of them are actionable.
+
+**The knee is at 8 episodes.** Every doubling up to 8 is a significant gain; the 8 → 16 doubling
+is not (+0.019, CI crosses zero) and costs as much as everything before it combined. Stage 1's
+choice of 8 was, by luck, right at the knee. Returns are roughly logarithmic in simulator steps:
+a 16× budget increase (300 → 4,800 steps) buys +0.21 of correlation.
+
+**The protocol mismatch cost essentially nothing — this is the reassuring one.** At equal *episode
+count* the matched protocol looks better, but each of its episodes costs 500 steps against 300. At
+**equal simulator-step budget the two are statistically indistinguishable at every point tested**
+(|Δρ| ≤ 0.012, every CI straddling zero). The one real advantage is at the very smallest budget:
+with a single episode, matched beats current by +0.090. So if a future run can afford only one or
+two episodes per body, use the matched protocol; otherwise it is a wash, and **Stage 1's headline
+numbers are not compromised by the mismatch.**
+
+**`max` is the statistic, not `mean`.** `rand_dx_max` climbs from 0.352 to 0.561 across the sweep
+while `rand_dx_mean` saturates around 0.41 by 4 episodes and then stops. What carries the signal is
+*the best thing a body did when it got lucky* — a cheap stand-in for "what a trained controller
+could get out of it" — not its average behaviour. That is a satisfying result given the whole
+premise: we are trying to estimate potential, and the max over random probes is the natural
+training-free estimator of a body's ceiling.
 
 ## 11. Assumptions
 
@@ -411,36 +464,67 @@ of controller evolution per morphology — at least 30,000 steps even for a popu
 realistically orders of magnitude more. So the proxy buys a large speed-up for a rank correlation
 around 0.65.
 
+**Where 0.655 sits.** A neighbour oracle — handed every one-voxel neighbour's *true* fitness —
+reaches 0.814 over the whole map (§9a), so there is real headroom above our 0.655. But that oracle
+collapses to ρ ≤ 0.23 *within* any fitness decile except the top one, so the headroom lives almost
+entirely in coarse-band separation, which the reach axes already do. Fine ranking within a band
+looks close to irreducible from body identity alone. And because ground truth is a
+best-of-attempts lower bound with an unmeasurable noise floor (§9b), 0.655 under-states the true
+relationship by an unknown margin. Between those two facts, 0.655 is better located than it looks:
+not near a hard ceiling, but not obviously far from a practical one either.
+
 What this does **not** establish: that these axes would survive on a harder task than flat-ground
 walking, on larger bodies, or that ρ ≈ 0.65 is enough to actually drive a search. Those are Stage 2
 questions.
 
 ## 13. Next run
 
-Before running on the 3000-morphology sample (`data/sample_large_ids.parquet`, already written):
+Before running on the 3000-morphology sample (`data/sample_large_ids.parquet`, already written).
+Items 1–3 are now backed by the §10 ablation rather than by guesswork.
 
-1. **Budget.** At 28 s/morphology, 3000 morphologies is ~5.8 hours on 4 cores. Either raise the
-   core count or drop the two costly families — knockout (23% of runtime) and neighbourhood (32%)
-   are the weakest performers per second, and dropping both cuts runtime by more than half while
-   costing little, since simulation-only minus those two is dominated by reach anyway.
-2. **Select the best gait at the task's own horizon.** `sin_best_dx_short` currently reports the
-   100-step displacement *of the gait that won at 300 steps*. Selecting the argmax over the sweep
-   by 100-step displacement instead is free — the data is already collected per episode — and
-   should be better matched to a 100-step ground truth.
-3. **Spend the reach budget on random episodes, not the sweep.** `rand_dx_max` beat every
-   sinusoid axis, and `rand_mean_speed` was the top permutation-importance feature. Trading some
-   of the 16-episode sinusoid sweep for more random episodes looks like the best marginal use of
-   simulation time.
-4. **Drop the dead weight.** Remove `n_components` (constant), the three redundant efficiency
-   variants, and `compactness` (0.92 with `n_voxels`). Keep one axis per redundant cluster.
-5. **Widen the knockout coverage instead of the depth.** `ko_frac_*` is missing for 17% of
-   morphologies because the intact body barely moves. Consider reporting the absolute delta (which
-   is always defined, and already present as `ko_dx_delta_worst` at ρ = −0.254) as the primary
-   knockout axis.
+1. **Rebuild the budget around the knee, and the run fits comfortably.** The ablation says
+   `rand_dx_max` saturates at 8 random episodes (8 → 16 is not significant). A battery of
+   8 random episodes (2,400 steps) + the 4-episode reduced sinusoid sweep (1,200 steps) + the
+   200-step settle is **~3,800 simulator steps ≈ 6 s/morphology**, so 3,000 morphologies is about
+   **75 minutes on 4 cores** — inside the cap, against ~5.8 hours for a naive rerun of the Stage 1
+   battery. Most of that saving comes from item 2.
+
+2. **Cut knockout and neighbourhood simulation.** Together they are 56% of Stage 1's runtime for
+   axes that are either redundant (`nbr_dx_mean` behaves much like the body's own reach) or
+   frequently missing (`ko_frac_*`, absent for 17% of bodies). Keep the *free* parts:
+   `nbr_feasible_fraction` and `nbr_n_feasible` are pure combinatorics and cost nothing.
+
+3. **Don't bother matching the ground truth's control protocol — but do use it if the budget is
+   tiny.** At equal simulator-step cost the 500-step/hold-5 protocol and Stage 1's
+   300-step/every-step protocol are statistically indistinguishable (§10). The exception is the
+   one-episode regime, where matched wins by +0.090. So: matched protocol only if spending ≤2
+   episodes per body; otherwise either is fine and the Stage 1 mismatch can be left alone.
+
+4. **Use `max`, not `mean`, wherever a statistic is taken over repeated probes.** `rand_dx_max`
+   climbs to 0.561 while `rand_dx_mean` saturates near 0.41. Apply the same logic to the
+   neighbourhood axis if it is kept.
+
+5. **Drop the dead weight.** Remove `n_components` (constant), three of the four efficiency
+   variants (all rank-identical), and `compactness` (0.92 with `n_voxels`). One axis per redundant
+   cluster.
+
 6. **Fix the sample design for the recall metric.** The top-100 block does not overlap the
-   stratified sample at all, which makes top-100 recall too easy to interpret cleanly. Either
-   stratify within the top decile as well, or report recall against a threshold drawn from the
-   sampled distribution.
-7. **Consider a harder target.** Flat-ground walking may be the easiest task in EvoGym for an
-   open-loop probe to imitate, which could be exactly why reach axes do so well. The claim would
-   be far stronger if it held on a task where the best open-loop gait is *not* a decent walker.
+   stratified sample at all (§8), which makes top-100 recall too easy to read. Either stratify
+   within the top decile as well, or report recall against a threshold drawn from the sampled
+   distribution.
+
+7. **Target the coarse/fine split directly.** §9a shows a neighbour oracle is strong between bands
+   and weak within them. Worth measuring whether our axes have the same profile: if they do, the
+   honest framing of this whole line of work is "cheap axes identify promising *regions*", and a
+   selector should be evaluated on region-level decisions, not on within-region ranking.
+
+8. **Consider a harder target.** Flat-ground walking may be the easiest task in EvoGym for an
+   open-loop probe to imitate, which could be exactly why reach axes do so well — a random-action
+   probe and a trained walker are doing recognisably the same thing. The claim would be far
+   stronger on a task where the best open-loop gait is *not* a decent solution.
+
+9. **Nothing here can beat an unknown noise floor.** §9b: the published map has one attempt per
+   morphology, so ground-truth reliability cannot be measured. If Stage 2 ever re-runs controller
+   evolution for even a few hundred bodies with two independent seeds, that split-half correlation
+   would be worth more than any additional axis — it would finally put a number on what any
+   predictor is competing against.
