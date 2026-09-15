@@ -46,6 +46,11 @@ def grid_to_idx(grid: np.ndarray) -> int:
     return int("".join(np.asarray(grid).flatten().astype(int).astype(str)), 5)
 
 
+def grid_from_str(s: str, bounding_box: tuple[int, int] = BOUNDING_BOX) -> np.ndarray:
+    """Inverse of the `grid` column stored in the sample parquet files."""
+    return np.array([int(c) for c in s], dtype=int).reshape(bounding_box)
+
+
 def is_feasible(grid: np.ndarray) -> bool:
     """The upstream search-space membership test, all three rules.
 
