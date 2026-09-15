@@ -1,4 +1,7 @@
-"""Step 1 smoke test: EvoGym is installed and a random valid 5x5 body simulates."""
+"""Step 1 smoke test: EvoGym is installed and a random valid body simulates.
+
+Run for both the project's working 3x3 space and the 5x5 space named in the original spec.
+"""
 import numpy as np
 import pytest
 
@@ -8,18 +11,22 @@ from axes.common import (ACTION_HIGH, ACTION_LOW, BOUNDING_BOX, MAX_EPISODE_STEP
 SMOKE_SEED = 20240517
 
 
-def random_valid_grid(rng, max_tries=10000):
-    """Rejection-sample a feasible 5x5 grid."""
+GRID_SIZES = [(3, 3), (5, 5)]
+
+
+def random_valid_grid(rng, size=BOUNDING_BOX, max_tries=10000):
+    """Rejection-sample a feasible grid of the given size."""
     for _ in range(max_tries):
-        grid = rng.integers(0, 5, size=BOUNDING_BOX)
+        grid = rng.integers(0, 5, size=size)
         if is_feasible(grid):
             return grid
     raise AssertionError("could not sample a feasible grid")
 
 
-def test_random_valid_body_steps_100_times():
+@pytest.mark.parametrize("size", GRID_SIZES)
+def test_random_valid_body_steps_100_times(size):
     rng = np.random.default_rng(SMOKE_SEED)
-    grid = random_valid_grid(rng)
+    grid = random_valid_grid(rng, size)
     assert is_feasible(grid)
 
     env = make_env(grid, seed=SMOKE_SEED)
@@ -47,10 +54,11 @@ def test_random_valid_body_steps_100_times():
         env.close()
 
 
-def test_env_action_space_is_the_expected_range():
+@pytest.mark.parametrize("size", GRID_SIZES)
+def test_env_action_space_is_the_expected_range(size):
     """EvoGym actuators take a target volume ratio in [0.6, 1.6]; 1.0 is neutral."""
     rng = np.random.default_rng(SMOKE_SEED)
-    grid = random_valid_grid(rng)
+    grid = random_valid_grid(rng, size)
     env = make_env(grid, seed=SMOKE_SEED)
     try:
         assert env.spec.id == TASK

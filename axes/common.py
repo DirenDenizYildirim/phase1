@@ -13,7 +13,10 @@ EMPTY, RIGID, SOFT, H_ACT, V_ACT = 0, 1, 2, 3, 4
 VOXEL_NAMES = {EMPTY: "empty", RIGID: "rigid", SOFT: "soft",
                H_ACT: "h_actuator", V_ACT: "v_actuator"}
 
-BOUNDING_BOX = (5, 5)
+# The ground truth's search space is 3x3, NOT 5x5 -- verified exactly: our independent
+# enumeration of feasible 3x3 grids reproduces the published key set (1,305,840 IDs,
+# min 93, max 5**9-1) as an exact set match. See notes/dataset.md.
+BOUNDING_BOX = (3, 3)
 
 # --- Environment config, matched to the ground truth (see notes/dataset.md) ---
 TASK = "Walker-v0"
