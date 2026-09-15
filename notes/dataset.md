@@ -73,16 +73,17 @@ Re-implemented in `axes.common.is_feasible` and cross-checked against upstream i
 
 ## 4. The task and environment
 
-From `simulator.py` and `main.py` upstream:
+From `simulator.py` and `main.py` upstream, cross-checked against the paper (arXiv 2508.17464):
 
 | setting | value |
 |---|---|
 | task | **`Walker-v0`** (EvoGym `WalkingFlat`, flat-ground locomotion) — the only choice `main.py` allows |
 | connections | `evogym.get_full_connectivity(body)` |
-| wrappers | `RecordEpisodeStatistics`, then `RewardShapingWrapper` (**-0.05 reward per step**) |
+| wrappers | `RecordEpisodeStatistics`, `ActionSkipWrapper(skip=5)`, `RewardShapingWrapper` (**-0.05 per controller query**) |
 | seeds | `env.seed(17)`, `action_space.seed(17)`, `observation_space.seed(17)` |
-| episode length | **100 steps** (see §5 — this is *not* the 500 the code appears to ask for) |
-| controller | a fixed-topology MLP, weights evolved by AFPO for 300 generations; body held fixed |
+| **episode length** | **500 simulator steps = 100 controller queries** (see §5) |
+| **control rate** | the controller acts every **5th** simulator step; the action is held in between |
+| controller | fixed-topology MLP, weights evolved by AFPO, **300 generations, population 20**; body fixed |
 
 EvoGym specifics confirmed locally (simulator v2.2.5): action space is `Box(0.6, 1.6)` per
 actuator — a target volume ratio, with **1.0 neutral** — `VOXEL_SIZE = 0.1`, and a 3x3 robot is
@@ -93,32 +94,51 @@ spawned spanning x in [0.1, 0.4], i.e. COM x = 0.25.
 `WalkingFlat.step` gives `reward = com_x(t+1) - com_x(t)`, so an episode's undiscounted return is
 simply the robot's **net centre-of-mass x-displacement in world units**. On top of that:
 
-- `RewardShapingWrapper` subtracts **0.05 per step**;
+- `RewardShapingWrapper` subtracts **0.05 per outer step** — that is, per *controller query*, not
+  per simulator step, because it wraps `ActionSkipWrapper`;
 - reaching `com_x > 9.9` ends the episode with a **+1.0** bonus;
 - an unstable simulation ends the episode with **-3.0**.
 
-So **fitness = (net COM x-displacement) - 0.05 x (number of steps)**.
+So **fitness = (net COM x-displacement) - 0.05 x (number of controller queries) = dx - 5.0.**
 
-### Episode length is 100 steps, established empirically
+### The episode is 500 simulator steps with the action held for 5 — not 100 steps
 
-The upstream code *looks* like it asks for 500 steps, but `simulator.make_env` writes
-`env.env.env.env.env._max_episode_steps = 500`, which walks past the `TimeLimit` wrapper and sets a
-dead attribute on an inner env. So the registered default governs. The data settles which it was:
+> **CORRECTION.** An earlier version of this file claimed the episode was "100 steps" and blamed
+> `simulator.make_env`'s `env.env.env.env.env._max_episode_steps = 500` for walking past the
+> `TimeLimit` wrapper onto a dead attribute. The **-5.0 offset was right, the mechanism was
+> wrong.** `TimeLimit` is in force at 500 simulator steps either way (that is the registered
+> default), and the factor of 5 comes from the action-skip, not from a shortened episode.
 
-| | measured / implied |
-|---|---|
-| ground-truth generation-1 fitness | min -5.7735, max -4.6480, **mean -4.9883** |
-| implied net displacement if 100 steps (offset -5.0) | min -0.774, max +0.352, **mean +0.012** |
-| implied net displacement if 500 steps (offset -25.0) | min +19.23, max +20.35, **mean +20.01** |
-| my measured displacement, random actions, 100 steps, 30 morphologies | min -0.106, max +0.261, **mean +0.010** |
-| my measured displacement, random actions, 500 steps, 30 morphologies | min -0.873, max +1.667, mean -0.048 |
+The paper states it directly, in "Task and fitness":
 
-Generation-1 controllers are random networks, so their net displacement should be near zero. Under
-a 100-step episode the implied mean is **+0.012** against my measured **+0.010** — essentially
-exact. Under 500 steps it would have to be **+20**, which is over an order of magnitude beyond
-anything reachable even at 500 steps. **Episode length is 100 steps.**
+> "The controller is queried every 5th timestep, and the last action is repeated for the remaining
+> timesteps."
 
-Two independent consistency checks pass:
+and
+
+> "an additional small negative penalty (−0.05) is applied each time step before the robot reaches
+> the target"
+
+That is `ActionSkipWrapper(skip=5)`, which performs 5 inner simulator steps per outer call and
+accumulates their reward, wrapped by `RewardShapingWrapper`, which charges -0.05 per *outer* call.
+With `TimeLimit` at 500 inner steps, an episode is exactly **500 / 5 = 100 controller queries**,
+for a total penalty of **100 x -0.05 = -5.0**.
+
+Verified by replicating the upstream wrapper stack (`skip=5`, 500-step `TimeLimit`, -0.05 per outer
+step) and driving it with random actions over 40 morphologies:
+
+| | min | max | mean |
+|---|---|---|---|
+| replicated stack, random actions — **fitness** | -5.9005 | -4.2580 | **-5.0920** |
+| ground-truth **generation-1** fitness | -5.7735 | -4.6480 | **-4.9883** |
+| replicated stack, random actions — displacement | -0.9005 | +0.7420 | -0.0920 |
+| implied generation-1 displacement (offset -5.0) | -0.7735 | +0.3520 | +0.0117 |
+
+Generation-1 controllers are random networks, so this is the right comparison, and both centre and
+spread line up. A 500-step episode *without* action-skip would need a -25.0 offset and an implied
+mean displacement of +20, which is unreachable.
+
+Two independent consistency checks also pass:
 
 - The best morphology's fitness of 4.4237 implies a displacement of 9.4237. Reaching the goal needs
   9.65 (from COM x = 0.25 to 9.9) and would have paid a +1.0 bonus and ended the episode early, so
@@ -127,9 +147,14 @@ Two independent consistency checks pass:
   short of the goal threshold.
 - No trajectory anywhere shows the -3.0 signature of an unstable simulation.
 
-**Interpretation for the report:** a fitness of -5.0 means "did not move"; every point above -5.0 is
-one world unit (10 voxel widths) of net forward travel. The observed range is -5.2718 to +4.4237,
-i.e. from slight backward drift to ~9.4 units of travel in 100 steps.
+**Interpretation:** a fitness of -5.0 means "did not move"; every point above -5.0 is one world
+unit (10 voxel widths) of net forward travel. The observed range is -5.2718 to +4.4237, i.e. from
+slight backward drift to ~9.4 units of travel in 500 simulator steps.
+
+**Consequence for our probes (a real limitation).** Stage 1's axes use 300 simulator steps with a
+fresh action every step. The ground truth uses 500 simulator steps with the action held for 5.
+Our probes matched neither the horizon nor the control rate. `analysis/episode_ablation.py`
+measures what that cost.
 
 ## 6. The two results files
 
@@ -147,16 +172,18 @@ Both have exactly the same 1,305,840 keys. Verified over the full set:
 
 So the "updated" map takes the 300-generation result and revises a minority of morphologies upward.
 
-> **ASSUMPTION:** the upstream README says `updated_results.pkl` holds "the estimated true fitness"
-> but does not describe the update procedure, and the file that would show it
-> (`updated_results_w_long.pkl`, referenced in `morphology_space_evolution.py:124`) is **not in the
-> published tarball**. Given that revisions are strictly upward and affect only ~6% of
-> morphologies, the natural reading is that promising morphologies were re-evaluated with longer or
-> repeated controller-evolution runs and the best result kept. **We take
-> `updated_results.pkl` at face value as the ground-truth "true fitness" target**, which is what the
-> README instructs. This does not affect our method: we only need a fixed per-morphology scalar to
-> correlate against. It does mean true fitness is a *best-of-attempts* estimate and therefore
-> slightly optimistic and noisy, which we note when interpreting correlation ceilings.
+> **RESOLVED (was an ASSUMPTION).** The update procedure is undocumented in the repo — the file
+> that would show it (`updated_results_w_long.pkl`, referenced in
+> `morphology_space_evolution.py:124`) is not in the published tarball — but **the paper states
+> it**, in "Updating the Landscape": fitness was re-estimated for **76,526** morphologies using
+> controllers discovered during the 10,000-generation brain-body co-optimization runs. Our
+> independently measured count of revised entries is **76,525**, differing by one (presumably a
+> morphology whose revised value was not numerically distinguishable from its original).
+>
+> So true fitness is the **best controller found for that body across the 300-generation AFPO run
+> and the co-optimization runs** — a best-of-attempts estimate, and therefore a *lower bound* on
+> achievable fitness that is noisy by an unquantified amount. Because there is only one attempt
+> stored per morphology, that noise cannot be measured; see `notes/landscape.md` §2.
 
 ## 7. Distribution of true fitness
 
