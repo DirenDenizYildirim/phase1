@@ -1,0 +1,18 @@
+# --- virtualenv ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- ground-truth raw data (large, fetched in Step 1, never committed) ---
+data/mc-landscape/
+
+# --- scratch ---
+*.tmp
+*.log
+scratch/
+
+# Derived parquet files under ./data/ ARE committed (kept < 50 MB).
+# Explicitly un-ignore them in case a broader rule is added later:
+!data/*.parquet
